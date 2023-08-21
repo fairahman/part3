@@ -12,8 +12,30 @@ mongoose.connect(Uri)
 
 
 const personSchema = new mongoose.Schema({
-  name: String,
-  number: String,
+  name: {
+    type: String,
+    minLength: 3,
+  },
+  number: {
+    type: String,
+    minLength:8,
+    validate: {
+      validator: function (value) {
+        // Custom validator logic
+        const parts = value.split('-');
+        if (parts.length !== 2) {
+          return false;
+        }
+
+        const [firstPart, secondPart] = parts;
+        const isValidFirstPart = /^\d{2,3}$/.test(firstPart);
+        const isValidSecondPart = /^\d+$/.test(secondPart);
+        
+        return isValidFirstPart && isValidSecondPart;
+      },
+      message: props => `${props.value} is not a valid phone number format`
+    }
+  }
 })
 
 personSchema.set('toJSON', {

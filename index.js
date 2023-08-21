@@ -44,80 +44,129 @@ morgan.token('body', function getId (req) {
 
 app.use(morgan(':body :method :url :status :res[content-length] - :response-time ms'))
 
-app.get('/api/persons/:id', (req, res) => {
-  console.log('param:', req.params);
-    const id = Number(req.params.id);
-    const dataToSend = data.find((person) => person.id === id )
-    if (dataToSend) {
-      return res.json(dataToSend);
-    }
-    else return res.status(404).end();
+
+app.get('/info', (req, res, next) => {
+  const currentTime = Date();
+  console.log(currentTime);
+  Person
+    .countDocuments({}) 
+    .then(count => {
+    console.log("count:", count)
+    res.send(`<h3>Phonebook has info for ${count} people</h3>
+    <h3>${currentTime}</h3>`);
+  })
+  
 });
 
 app.get('/api/persons/', (req, res) => {
    console.log("in the /api/persons/ endpoint");
   // console.log('param:', req.params);
   Person.find({}).then(people => {
-    console.log("people:", people)
+    // console.log("people:", people)
     res.json(people)});
   return;  
 });
 
-app.get('/api/info', (req, res) => {
-  const currentTime = Date();
-  console.log(currentTime);
-  res.send(`<h3>Phonebook has info for ${data.length} people</h3>
-            <h3>${currentTime}</h3>`);
+app.get('/api/persons/:id', (req, res, next) => {
+  console.log('param:', req.params);
+  const id = req.params.id;   
+  Person
+    .findById(id).exec()
+    .then(person => {  
+      if (person) {
+      return res.json(person);
+      }
+      else {
+        console.log("person:", person)
+        res.status(404).end()
+      }
+    })
+    .catch(err => next(err))
+  
 });
 
-app.delete('/api/persons/:id', (req, res) => {
-  console.log('in the /api/persons/:id')
-  const id = Number(req.params.id);
+app.delete('/api/persons/:id', (req, res, next) => {
+  console.log('in the app.delete()')
+  const id = req.params.id;
+  console.log("id, in app.delete", id);
+  // data = data.filter((contact) => contact.id !== id);
+  Person
+    .findByIdAndRemove(id)
+    .then(result => {
+      if (result) {
+        console.log('result from app.delete():', result)
+        return res.status(204).send();
+      }
+      console.log('id not found');
+      return res.status(404).send("id doesn't exist in database");
+    })
+    .catch(error => {
+      console.log(error)
+      next(error);
+    })
+    
+});
+
+app.post('/api/persons', function (req, res, next) {
+	const body = req.body;
+  Person.findOne({ name: body.name})
+  .then(existingContact => {
+    if (existingContact) {
+      console.log('Contact already exists:', existingContact);
+      // NEED TO WORK ON THIS...
+    }
+    else {
+      const person = new Person({name: body.name, number: body.number})
+      person
+        .save()
+        .then(savedPerson => {
+          console.log(savedPerson)
+          res.json(savedPerson);
+        })
+        .catch(err => {
+          next(err); 
+         })
+    } 
+  })
+});
+
+app.put('/api/persons/:id', (req, res, next) => {
+  const id = req.params.id
   console.log("id", id);
-  data = data.filter((contact) => contact.id !== id);
-  console.log("data", data)
-  res.status(204).end();
-});
-
-app.post('/api/persons', function (req, res) {
-	const newContact = req.body;
-  // if (!newContact.name || !newContact.number) {
-  //   console.log('name or number missing...')
-  //    return res.status(404).end();
-  // }
-  if(data.find(contact => {
-      console.log(contact.name, newContact.name)
-      return contact.name === newContact.name
-    })) {
-    console.log('contact already exists...')
-    res.statusMessage = 'contact already exists...'
-    return res.status(404).end();
-  }
- 
-  const id =  Math.floor(Math.random() * 1550);
-  newContact.id = id;
-  data.push(newContact)
-  console.log(data)
-  res.send(newContact);
-});
-
-app.put('/api/persons/:id', (req,res) => {
-  const id = Number(req.params.id)
-  console.log("id", id);
-  const number = req.body.number;
-  console.log("number", number);
-
+  console.log("req.body at app.put()", req.body);
   console.log("req.body", req.body);
-  const indexToUpdate = data.findIndex(contact => contact.id === id);
-  console.log("indexToUpdate", indexToUpdate, typeof indexToUpdate)
-  if (indexToUpdate !== -1) {
-    data[indexToUpdate] = {...data[indexToUpdate], number}
-   console.log("dataindexToUpdate: how is this possible?")
-
-   res.status(200).json(data[indexToUpdate]);
-  }
-  else res.status(404).json({error: "contact not found"})
+  // const indexToUpdate = data.findIndex(contact => contact.id === id);
+  Person
+    .findByIdAndUpdate(id, req.body, { new: true, runValidators: true, context: 'query' })
+    .then(updatedContact => {
+      console.log("updated contact:", updatedContact)
+      if (!updatedContact) {
+        console.log('Document not found.');
+        res.status(404).send();
+        return;
+      }
+      return res.status(200).json(updatedContact);
+    })
+    .catch(err => {
+     next(err); 
+    })
+  
 });
+
+app.use((req, res, next) => {
+  res.status(404).send({ error: 'Route not found' });
+});
+const errorHandler = (err, req, res, next) => {
+  console.log("err:", err)
+  if (err.name === 'CastError') {
+    return res.status(400).send({ error: 'malformatted id' })
+  }
+  if (err.name === 'ValidationError') {
+    return res.status(400).send(err);
+  }
+  res.status(500).send({ error: 'Something went wrong' });
+}
+app.use(errorHandler);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
