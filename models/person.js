@@ -1,9 +1,9 @@
-const mongoose = require('mongoose');
-const Uri = process.env.MONGO_URI;
+const mongoose = require('mongoose')
+const Uri = process.env.MONGO_URI
 mongoose.set('strictQuery', false)
 
 mongoose.connect(Uri)
-  .then(result => {
+  .then(() => {
     console.log('connected to MongoDB')
   })
   .catch((error) => {
@@ -22,16 +22,15 @@ const personSchema = new mongoose.Schema({
     validate: {
       validator: function (value) {
         // Custom validator logic
-        const parts = value.split('-');
+        const parts = value.split('-')
         if (parts.length !== 2) {
-          return false;
+          return false
         }
 
-        const [firstPart, secondPart] = parts;
-        const isValidFirstPart = /^\d{2,3}$/.test(firstPart);
-        const isValidSecondPart = /^\d+$/.test(secondPart);
-        
-        return isValidFirstPart && isValidSecondPart;
+        const [firstPart, secondPart] = parts
+        const isValidFirstPart = /^\d{2,3}$/.test(firstPart)
+        const isValidSecondPart = /^\d+$/.test(secondPart)
+        return isValidFirstPart && isValidSecondPart
       },
       message: props => `${props.value} is not a valid phone number format`
     }
@@ -45,4 +44,4 @@ personSchema.set('toJSON', {
     delete returnedObject.__v
   }
 })
-module.exports =  mongoose.model('Person', personSchema);
+module.exports =  mongoose.model('Person', personSchema)
